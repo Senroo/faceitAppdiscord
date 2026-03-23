@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Faceit Tracker v2</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d0e11; --panel: #14161a; --border: #1f2229;
+      --accent: #ff5500; --accent2: #ff8c42;
+      --green: #00d26a; --red: #ff4655; --yellow: #ffd700;
+      --text: #e8eaf0; --muted: #5a5f6e; --discord: #5865f2;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Mono', monospace; min-height: 100vh; }
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 0 20px 60px; position: relative; z-index: 1; }
+
+    /* Header */
+    header { border-bottom: 1px solid var(--border); padding: 24px 0 20px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .logo { display: flex; align-items: center; gap: 14px; }
+    .logo-icon { width: 40px; height: 40px; background: var(--accent); clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .logo h1 { font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+    .logo h1 span { color: var(--accent); }
+    .logo small { font-size: 10px; color: var(--muted); letter-spacing: 1px; display: block; }
+    .header-right { display: flex; gap: 10px; align-items: center; }
+    .status-badge { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; padding: 6px 12px; border: 1px solid var(--border); border-radius: 2px; color: var(--muted); }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); transition: all 0.3s; }
+    .status-dot.active { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+    .bot-badge { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; padding: 6px 12px; border: 1px solid var(--border); border-radius: 2px; color: var(--muted); }
+    .bot-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+    .bot-dot.online { background: var(--discord); box-shadow: 0 0 8px var(--discord); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+    /* Tabs */
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+    .tab { padding: 10px 20px; font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; color: var(--muted); border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; background: none; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Grid */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .grid-1 { margin-bottom: 16px; }
+    @media(max-width:640px){.grid-2{grid-template-columns:1fr}}
+
+    /* Panel */
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 20px; }
+    .panel-title { font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .panel-title::before { content: ''; display: block; width: 3px; height: 14px; background: var(--accent); }
+
+    /* Form */
+    .form-group { margin-bottom: 12px; }
+    label { display: block; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+    input { width: 100%; background: #0d0e11; border: 1px solid var(--border); color: var(--text); padding: 10px 12px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; border-radius: 2px; outline: none; transition: border-color 0.2s; }
+    input:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--muted); }
+
+    /* Buttons */
+    .btn { padding: 10px 18px; font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; border: none; cursor: pointer; border-radius: 2px; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-save { background: var(--accent); color: white; width: 100%; justify-content: center; margin-top: 4px; }
+    .btn-save:hover { background: var(--accent2); transform: translateY(-1px); }
+    .btn-add { background: transparent; border: 1px solid var(--accent); color: var(--accent); width: 100%; justify-content: center; }
+    .btn-add:hover { background: rgba(255,85,0,0.08); }
+    .btn-toggle-on  { background: var(--green); color:#000; width:100%; justify-content:center; padding:14px; font-size:15px; }
+    .btn-toggle-off { background: transparent; border:1px solid var(--red); color:var(--red); width:100%; justify-content:center; padding:14px; font-size:15px; }
+    .btn-toggle-on:hover  { filter: brightness(1.1); }
+    .btn-toggle-off:hover { background: rgba(255,70,85,0.08); }
+    .btn-test { background:transparent; border:1px solid var(--discord); color:var(--discord); width:100%; justify-content:center; margin-top:8px; }
+    .btn-test:hover { background:rgba(88,101,242,0.08); }
+    .btn-remove { background:transparent; border:none; color:var(--muted); cursor:pointer; padding:4px 6px; font-size:16px; border-radius:2px; transition:color 0.15s; }
+    .btn-remove:hover { color:var(--red); }
+    .btn-sm { padding:5px 12px; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:11px; letter-spacing:1px; text-transform:uppercase; border-radius:2px; cursor:pointer; transition:all 0.15s; }
+    .btn-discord { background:transparent; border:1px solid var(--discord); color:var(--discord); }
+    .btn-discord:hover { background:rgba(88,101,242,0.1); }
+    .btn-muted { background:transparent; border:1px solid var(--border); color:var(--muted); }
+    .btn-muted:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* Player list */
+    .player-list { display:flex; flex-direction:column; gap:8px; }
+    .player-card { display:flex; align-items:center; justify-content:space-between; background:#0d0e11; border:1px solid var(--border); border-radius:2px; padding:10px 12px; animation:slideIn 0.2s ease; }
+    @keyframes slideIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
+    .player-info { display:flex; align-items:center; gap:10px; }
+    .player-avatar { width:32px; height:32px; border-radius:2px; background:var(--border); object-fit:cover; }
+    .player-name { font-family:'Rajdhani',sans-serif; font-weight:600; font-size:15px; }
+    .player-sub { font-size:10px; color:var(--muted); }
+
+    /* Logs */
+    .log-list { max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; }
+    .log-list::-webkit-scrollbar{width:4px} .log-list::-webkit-scrollbar-track{background:transparent} .log-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+    .log-entry { display:flex; gap:10px; font-size:11px; padding:5px 8px; border-radius:2px; background:#0d0e11; border-left:2px solid transparent; line-height:1.4; }
+    .log-entry.success{border-left-color:var(--green)} .log-entry.error{border-left-color:var(--red)} .log-entry.warn{border-left-color:var(--yellow)} .log-entry.info{border-left-color:var(--muted)}
+    .log-time{color:var(--muted);flex-shrink:0} .log-msg{color:var(--text)}
+
+    /* Leaderboard */
+    .lb-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .lb-table { width:100%; border-collapse:collapse; }
+    .lb-table th { font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); text-align:left; padding:6px 10px; border-bottom:1px solid var(--border); }
+    .lb-table th.right { text-align:right; }
+    .lb-row { border-bottom:1px solid var(--border); transition:background 0.1s; animation:slideIn 0.25s ease both; }
+    .lb-row:hover{background:rgba(255,85,0,0.04)} .lb-row:last-child{border-bottom:none}
+    .lb-row td{padding:10px;vertical-align:middle}
+    .lb-rank{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px;width:36px;text-align:center}
+    .rank-1{color:#ffd700} .rank-2{color:#c0c0c0} .rank-3{color:#cd7f32} .rank-other{color:var(--muted)}
+    .lb-player{display:flex;align-items:center;gap:10px}
+    .lb-avatar{width:34px;height:34px;border-radius:2px;background:var(--border);object-fit:cover;flex-shrink:0}
+    .lb-nickname{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px}
+    .lb-country{font-size:10px;color:var(--muted)}
+    .lb-level{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:12px}
+    .lb-elo{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;text-align:right}
+    .lb-stat{font-size:13px;text-align:right;font-family:'IBM Plex Mono',monospace}
+    .lb-recent{display:flex;gap:3px;justify-content:flex-end}
+    .dot-win{width:8px;height:8px;border-radius:50%;background:var(--green)}
+    .dot-loss{width:8px;height:8px;border-radius:50%;background:var(--red)}
+    .lb-sort-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:10px;padding:0 2px}
+    .lb-sort-btn.active{color:var(--accent)}
+    .lb-loading{text-align:center;padding:40px;color:var(--muted);font-size:12px;letter-spacing:1px}
+    .lb-loading-dots::after{content:'...';animation:dots 1.2s steps(4,end) infinite}
+    @keyframes dots{0%,20%{content:''}30%,50%{content:'.'}60%,80%{content:'..'}90%,100%{content:'...'}}
+    .lvl-1{background:#888;color:#fff}.lvl-2{background:#eee;color:#000}
+    .lvl-3,.lvl-4{background:#1ddc17;color:#000}.lvl-5,.lvl-6,.lvl-7{background:#ff9c17;color:#000}
+    .lvl-8,.lvl-9,.lvl-10{background:#ff1717;color:#fff}.lvl-10e{background:#aa00ff;color:#fff}
+    @media(max-width:600px){.lb-table .hide-mobile{display:none}}
+
+    /* History tab */
+    .history-player-select { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+    .player-pill { padding:6px 14px; font-family:'Rajdhani',sans-serif; font-weight:600; font-size:12px; letter-spacing:1px; text-transform:uppercase; border:1px solid var(--border); border-radius:20px; cursor:pointer; color:var(--muted); transition:all 0.15s; background:none; }
+    .player-pill:hover { border-color:var(--accent); color:var(--accent); }
+    .player-pill.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+    .match-list { display:flex; flex-direction:column; gap:6px; }
+    .match-card { display:grid; grid-template-columns:24px 60px 1fr auto; align-items:center; gap:12px; background:#0d0e11; border:1px solid var(--border); border-left:3px solid var(--border); border-radius:2px; padding:10px 14px; animation:slideIn 0.2s ease; }
+    .match-card.win  { border-left-color:var(--green); }
+    .match-card.loss { border-left-color:var(--red); }
+    .match-result-dot { width:10px; height:10px; border-radius:50%; }
+    .match-result-dot.win  { background:var(--green); box-shadow:0 0 6px var(--green); }
+    .match-result-dot.loss { background:var(--red);   box-shadow:0 0 6px var(--red); }
+    .match-map { font-family:'Rajdhani',sans-serif; font-weight:700; font-size:14px; }
+    .match-score { font-size:11px; color:var(--muted); }
+    .match-stats { display:flex; gap:14px; flex-wrap:wrap; }
+    .match-stat { font-size:12px; }
+    .match-stat span { color:var(--muted); margin-right:3px; }
+    .match-date { font-size:10px; color:var(--muted); text-align:right; white-space:nowrap; }
+
+    /* ELO Chart */
+    .chart-player-select { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+    .chart-wrapper { position:relative; height:280px; }
+    .elo-stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:14px; }
+    .elo-stat-card { background:#0d0e11; border:1px solid var(--border); border-radius:2px; padding:12px; text-align:center; }
+    .elo-stat-value { font-family:'Rajdhani',sans-serif; font-weight:700; font-size:22px; }
+    .elo-stat-label { font-size:10px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-top:2px; }
+    .elo-positive { color:var(--green); }
+    .elo-negative { color:var(--red); }
+
+    /* Toast */
+    #toast { position:fixed; bottom:24px; right:24px; padding:10px 18px; background:var(--panel); border:1px solid var(--border); border-radius:2px; font-size:12px; letter-spacing:0.5px; opacity:0; transform:translateY(8px); transition:all 0.2s; z-index:999; pointer-events:none; }
+    #toast.show{opacity:1;transform:translateY(0)} #toast.ok{border-left:3px solid var(--green)} #toast.err{border-left:3px solid var(--red)}
+
+    .empty-state { text-align:center; padding:24px; color:var(--muted); font-size:12px; letter-spacing:1px; }
+    .btn-refresh { background:transparent; border:1px solid var(--border); color:var(--muted); font-family:'IBM Plex Mono',monospace; font-size:11px; padding:5px 10px; cursor:pointer; border-radius:2px; transition:all 0.15s; display:flex; align-items:center; gap:6px; }
+    .btn-refresh:hover{border-color:var(--accent);color:var(--accent)}
+    .btn-refresh.spinning span{display:inline-block;animation:spin 0.8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .flex-row{display:flex;gap:8px;align-items:center}
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <div>
+        <h1>Faceit <span>Tracker</span></h1>
+        <small>v2.0 — Discord Bot + ELO History</small>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="bot-badge">
+        <div class="bot-dot" id="botDot"></div>
+        <span id="botText">Bot offline</span>
+      </div>
+      <div class="status-badge">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Inactif</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active"  onclick="switchTab('dashboard',   this)">⚙️ Dashboard</button>
+    <button class="tab"         onclick="switchTab('leaderboard', this)">🏆 Classement</button>
+    <button class="tab"         onclick="switchTab('history',     this)">📅 Historique</button>
+    <button class="tab"         onclick="switchTab('elo',         this)">📈 ELO Graph</button>
+  </div>
+
+  <!-- ═══════════ DASHBOARD ═══════════ -->
+  <div id="tab-dashboard" class="tab-content active">
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">Configuration API</div>
+        <div class="form-group"><label>Faceit API Key</label><input type="password" id="faceitApiKey" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" /></div>
+        <div class="form-group"><label>Discord Webhook URL</label><input type="password" id="discordWebhook" placeholder="https://discord.com/api/webhooks/..." /></div>
+        <div class="form-group"><label>Intervalle de vérification (sec)</label><input type="number" id="pollInterval" placeholder="60" min="30" /></div>
+        <button class="btn btn-save" onclick="saveConfig()">💾 Sauvegarder</button>
+        <button class="btn btn-test" onclick="testWebhook()">🔔 Tester Webhook Discord</button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="panel">
+          <div class="panel-title">Bot Discord (Slash Commands)</div>
+          <div class="form-group"><label>Bot Token</label><input type="password" id="discordBotToken" placeholder="MTI3..." /></div>
+          <div class="form-group"><label>Guild ID (serveur) — optionnel</label><input type="text" id="discordGuildId" placeholder="123456789012345678" /></div>
+          <button class="btn btn-save" style="background:var(--discord)" onclick="saveBotConfig()">🤖 Connecter le Bot</button>
+          <div style="margin-top:10px;font-size:10px;color:var(--muted);line-height:1.6">
+            Commandes disponibles:<br>
+            <code>/classement</code> · <code>/stats &lt;joueur&gt;</code> · <code>/historique &lt;joueur&gt;</code>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Contrôle</div>
+          <button class="btn btn-toggle-on" id="toggleBtn" onclick="toggle()">▶ DÉMARRER</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">Ajouter un joueur</div>
+        <div class="form-group"><label>Pseudo Faceit</label><input type="text" id="newNickname" placeholder="ex: s1mple" onkeydown="if(event.key==='Enter')addPlayer()" /></div>
+        <button class="btn btn-add" onclick="addPlayer()">＋ Ajouter</button>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Joueurs suivis</div>
+        <div class="player-list" id="playerList"><div class="empty-state">Aucun joueur</div></div>
+      </div>
+    </div>
+
+    <div class="grid-1">
+      <div class="panel">
+        <div class="panel-title">Logs</div>
+        <div class="log-list" id="logList"><div class="empty-state">En attente...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ CLASSEMENT ═══════════ -->
+  <div id="tab-leaderboard" class="tab-content">
+    <div class="panel">
+      <div class="lb-header">
+        <div class="panel-title" style="margin-bottom:0">Classement du groupe</div>
+        <div class="flex-row">
+          <button class="btn-sm btn-discord" onclick="postLeaderboard()">📨 Poster Discord</button>
+          <button class="btn-refresh" id="refreshBtn" onclick="loadLeaderboard(true)"><span>↻</span> Actualiser</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Classé par ELO · Cliquer sur un en-tête pour trier</div>
+      <div id="lbContainer"><div class="lb-loading">Ouvrez l'onglet pour charger</div></div>
+    </div>
+  </div>
+
+  <!-- ═══════════ HISTORIQUE ═══════════ -->
+  <div id="tab-history" class="tab-content">
+    <div class="panel">
+      <div class="panel-title">Historique des matchs</div>
+      <div class="history-player-select" id="historyPills"></div>
+      <div id="historyContent"><div class="empty-state">Sélectionnez un joueur</div></div>
+    </div>
+  </div>
+
+  <!-- ═══════════ ELO GRAPH ═══════════ -->
+  <div id="tab-elo" class="tab-content">
+    <div class="panel">
+      <div class="panel-title">Progression ELO</div>
+      <div class="chart-player-select" id="eloPills"></div>
+      <div class="chart-wrapper"><canvas id="eloChart"></canvas></div>
+      <div class="elo-stats-row" id="eloStats"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let players = [];
+let isActive = false;
+let botConnected = false;
+let lbData = [], lbSortKey = 'elo', lbSortDir = -1, lbLoaded = false;
+let eloChartInstance = null;
+let currentHistoryPlayer = null;
+let currentEloPlayer = null;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function toast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${type}`;
+  setTimeout(() => t.className = '', 2800);
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(`/api${path}`, { headers: {'Content-Type':'application/json'}, ...opts });
+  return res.json();
+}
+
+// ── Status ────────────────────────────────────────────────────────────────────
+async function loadStatus() {
+  const data = await api('/status');
+  isActive = data.active;
+  players  = data.players || [];
+  botConnected = data.botConnected || false;
+  renderPlayers();
+  updateToggleUI();
+  updateBotUI();
+  refreshPills();
+}
+
+function updateToggleUI() {
+  const btn = document.getElementById('toggleBtn');
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  if (isActive) {
+    btn.className = 'btn btn-toggle-off'; btn.textContent = '⏹ ARRÊTER';
+    dot.classList.add('active'); text.textContent = 'Actif';
+  } else {
+    btn.className = 'btn btn-toggle-on'; btn.textContent = '▶ DÉMARRER';
+    dot.classList.remove('active'); text.textContent = 'Inactif';
+  }
+}
+
+function updateBotUI() {
+  const dot  = document.getElementById('botDot');
+  const text = document.getElementById('botText');
+  if (botConnected) {
+    dot.classList.add('online'); text.textContent = 'Bot en ligne';
+  } else {
+    dot.classList.remove('online'); text.textContent = 'Bot offline';
+  }
+}
+
+// ── Config ────────────────────────────────────────────────────────────────────
+async function saveConfig() {
+  const res = await api('/config', { method:'POST', body: JSON.stringify({
+    faceitApiKey:   document.getElementById('faceitApiKey').value,
+    discordWebhook: document.getElementById('discordWebhook').value,
+    pollIntervalSeconds: parseInt(document.getElementById('pollInterval').value) || 60,
+  })});
+  res.ok ? toast('✅ Sauvegardé !') : toast('❌ ' + res.error, 'err');
+}
+
+async function saveBotConfig() {
+  const res = await api('/config', { method:'POST', body: JSON.stringify({
+    discordBotToken: document.getElementById('discordBotToken').value,
+    discordGuildId:  document.getElementById('discordGuildId').value,
+  })});
+  if (res.ok) { toast('🤖 Bot connecté — attendre quelques secondes...'); setTimeout(loadStatus, 3000); }
+  else toast('❌ ' + res.error, 'err');
+}
+
+async function testWebhook() {
+  const res = await api('/test-webhook', { method:'POST' });
+  res.ok ? toast('✅ Message Discord envoyé !') : toast('❌ ' + res.error, 'err');
+}
+
+async function toggle() {
+  const res = await api('/toggle', { method:'POST' });
+  if (res.error) return toast('❌ ' + res.error, 'err');
+  isActive = res.active;
+  updateToggleUI();
+  toast(isActive ? '▶ Tracker démarré !' : '⏹ Tracker arrêté');
+}
+
+// ── Players ───────────────────────────────────────────────────────────────────
+async function addPlayer() {
+  const nickname = document.getElementById('newNickname').value.trim();
+  if (!nickname) return;
+  document.getElementById('newNickname').value = '';
+  toast(`🔍 Recherche de ${nickname}...`);
+  const res = await api('/players/add', { method:'POST', body: JSON.stringify({ nickname }) });
+  if (res.error) return toast('❌ ' + res.error, 'err');
+  players.push(res);
+  renderPlayers();
+  refreshPills();
+  toast(`✅ ${res.nickname} ajouté !`);
+}
+
+async function removePlayer(id) {
+  await api(`/players/${id}`, { method:'DELETE' });
+  players = players.filter(p => p.id !== id);
+  renderPlayers();
+  refreshPills();
+}
+
+function renderPlayers() {
+  const list = document.getElementById('playerList');
+  if (!players.length) { list.innerHTML = '<div class="empty-state">Aucun joueur</div>'; return; }
+  list.innerHTML = players.map(p => `
+    <div class="player-card">
+      <div class="player-info">
+        <img class="player-avatar" src="${p.avatar||''}" onerror="this.style.opacity='0.2'" />
+        <div>
+          <div class="player-name">${p.nickname}</div>
+          <div class="player-sub">${p.country ? p.country.toUpperCase() + ' · ' : ''}${p.id.substring(0,8)}...</div>
+        </div>
+      </div>
+      <button class="btn-remove" onclick="removePlayer('${p.id}')">✕</button>
+    </div>`).join('');
+}
+
+// ── Pills (shared) ─────────────────────────────────────────────────────────────
+function refreshPills() {
+  renderHistoryPills();
+  renderEloPills();
+}
+
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+async function loadLeaderboard(force = false) {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  document.getElementById('lbContainer').innerHTML = '<div class="lb-loading"><span class="lb-loading-dots">Chargement</span></div>';
+  try {
+    const data = await api('/leaderboard' + (force ? '?force=1' : ''));
+    if (data.error) throw new Error(data.error);
+    lbData = data; lbLoaded = true;
+    renderLeaderboard();
+  } catch(e) {
+    document.getElementById('lbContainer').innerHTML = `<div class="lb-loading" style="color:var(--red)">❌ ${e.message}</div>`;
+  }
+  btn.classList.remove('spinning');
+}
+
+function sortLeaderboard(key) {
+  lbSortDir = lbSortKey === key ? lbSortDir * -1 : -1;
+  lbSortKey = key;
+  renderLeaderboard();
+}
+
+function getLvlClass(l) { return l >= 10 ? 'lvl-10e' : `lvl-${l}`; }
+
+function renderLeaderboard() {
+  const sorted = [...lbData].sort((a,b) => (a[lbSortKey]>b[lbSortKey]?1:-1)*lbSortDir);
+  const rankMap = {};
+  [...lbData].sort((a,b)=>b.elo-a.elo).forEach((p,i)=>rankMap[p.id]=i+1);
+  const si = (key) => `<button class="lb-sort-btn${lbSortKey===key?' active':''}" onclick="sortLeaderboard('${key}')">${lbSortKey===key?(lbSortDir===-1?'↓':'↑'):'⇅'}</button>`;
+  if (!sorted.length) { document.getElementById('lbContainer').innerHTML='<div class="lb-loading">Aucun joueur</div>'; return; }
+  const rb = (r) => r<=3?`<span class="lb-rank rank-${r}">${['🥇','🥈','🥉'][r-1]}</span>`:`<span class="lb-rank rank-other">${r}</span>`;
+  document.getElementById('lbContainer').innerHTML = `
+    <table class="lb-table"><thead><tr>
+      <th style="width:40px">#</th><th>Joueur</th><th class="right">Lvl</th>
+      <th class="right">ELO ${si('elo')}</th>
+      <th class="right hide-mobile">K/D ${si('kd')}</th>
+      <th class="right hide-mobile">HS% ${si('hs')}</th>
+      <th class="right hide-mobile">Win% ${si('winRate')}</th>
+      <th class="right hide-mobile">Matchs ${si('matches')}</th>
+      <th class="right">Récents</th>
+    </tr></thead><tbody>
+    ${sorted.map((p,i)=>{
+      const rank=rankMap[p.id];
+      const recent=(p.recentResults||[]).slice(0,5).map(r=>`<div class="${r==='1'?'dot-win':'dot-loss'}"></div>`).join('');
+      const kdc=p.kd>=1.5?'var(--green)':p.kd<0.9?'var(--red)':'var(--text)';
+      const eloc=rank===1?'var(--yellow)':rank===2?'#c0c0c0':rank===3?'#cd7f32':'var(--text)';
+      return `<tr class="lb-row" style="animation-delay:${i*.04}s">
+        <td>${rb(rank)}</td>
+        <td><div class="lb-player">
+          <img class="lb-avatar" src="${p.avatar}" onerror="this.style.opacity='0.2'" />
+          <div><div class="lb-nickname">${p.nickname}</div><div class="lb-country">${p.country||''}</div></div>
+        </div></td>
+        <td class="right"><span class="lb-level ${getLvlClass(p.level)}">${p.level}</span></td>
+        <td class="lb-elo right" style="color:${eloc}">${p.elo}</td>
+        <td class="lb-stat right hide-mobile" style="color:${kdc}">${p.kd.toFixed(2)}</td>
+        <td class="lb-stat right hide-mobile">${p.hs.toFixed(0)}%</td>
+        <td class="lb-stat right hide-mobile">${p.winRate.toFixed(0)}%</td>
+        <td class="lb-stat right hide-mobile">${p.matches}</td>
+        <td><div class="lb-recent">${recent}</div></td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>`;
+}
+
+async function postLeaderboard() {
+  const res = await api('/leaderboard/post-discord', { method:'POST' });
+  res.ok ? toast('📊 Classement posté !') : toast('❌ ' + res.error, 'err');
+}
+
+// ── History ───────────────────────────────────────────────────────────────────
+function renderHistoryPills() {
+  const el = document.getElementById('historyPills');
+  if (!players.length) { el.innerHTML='<div style="color:var(--muted);font-size:12px">Aucun joueur enregistré</div>'; return; }
+  el.innerHTML = players.map(p=>`
+    <button class="player-pill${currentHistoryPlayer===p.id?' active':''}" onclick="selectHistoryPlayer('${p.id}','${p.nickname}')">${p.nickname}</button>`
+  ).join('');
+}
+
+async function selectHistoryPlayer(id, nickname) {
+  currentHistoryPlayer = id;
+  renderHistoryPills();
+  document.getElementById('historyContent').innerHTML = '<div class="lb-loading"><span class="lb-loading-dots">Chargement</span></div>';
+  const data = await api(`/history/${id}`);
+  if (!data.length) { document.getElementById('historyContent').innerHTML='<div class="empty-state">Pas encore d\'historique pour ce joueur</div>'; return; }
+  document.getElementById('historyContent').innerHTML = `
+    <div class="match-list">
+      ${data.map(m=>{
+        const d = m.ts ? new Date(m.ts).toLocaleDateString('fr-FR') : '?';
+        const kdc = parseFloat(m.kd)>=1.5?'var(--green)':parseFloat(m.kd)<0.9?'var(--red)':'var(--text)';
+        return `<div class="match-card ${m.result==='Win'?'win':'loss'}">
+          <div class="match-result-dot ${m.result==='Win'?'win':'loss'}"></div>
+          <div><div class="match-map">${m.map}</div><div class="match-score">${m.score}</div></div>
+          <div class="match-stats">
+            <div class="match-stat"><span>KDA</span>${m.kills}/${m.deaths}/${m.assists}</div>
+            <div class="match-stat" style="color:${kdc}"><span>K/D</span>${m.kd}</div>
+            <div class="match-stat"><span>HS</span>${m.hs}%</div>
+            <div class="match-stat"><span>ADR</span>${m.adr||'?'}</div>
+            <div class="match-stat"><span>MVPs</span>${m.mvps}</div>
+          </div>
+          <div class="match-date">${d}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+// ── ELO Graph ─────────────────────────────────────────────────────────────────
+function renderEloPills() {
+  const el = document.getElementById('eloPills');
+  if (!players.length) { el.innerHTML='<div style="color:var(--muted);font-size:12px">Aucun joueur enregistré</div>'; return; }
+  el.innerHTML = players.map(p=>`
+    <button class="player-pill${currentEloPlayer===p.id?' active':''}" onclick="selectEloPlayer('${p.id}','${p.nickname}')">${p.nickname}</button>`
+  ).join('');
+}
+
+async function selectEloPlayer(id, nickname) {
+  currentEloPlayer = id;
+  renderEloPills();
+  const raw = await api(`/elo-history/${id}`);
+  if (!raw.length) {
+    document.getElementById('eloStats').innerHTML='<div class="empty-state" style="grid-column:span 4">Pas encore de données ELO pour ce joueur.<br>Elles s\'accumulent au fil du polling.</div>';
+    if (eloChartInstance) { eloChartInstance.destroy(); eloChartInstance=null; }
+    return;
+  }
+  const sorted = [...raw].sort((a,b)=>a.ts-b.ts);
+  const labels = sorted.map(s=>new Date(s.ts).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}));
+  const values = sorted.map(s=>s.elo);
+  const current = values[values.length-1];
+  const start   = values[0];
+  const max     = Math.max(...values);
+  const min     = Math.min(...values);
+  const diff    = current - start;
+  const diffStr = (diff>=0?'+':'')+diff;
+  const diffColor = diff>=0?'var(--green)':'var(--red)';
+
+  document.getElementById('eloStats').innerHTML = `
+    <div class="elo-stat-card"><div class="elo-stat-value">${current}</div><div class="elo-stat-label">ELO Actuel</div></div>
+    <div class="elo-stat-card"><div class="elo-stat-value" style="color:${diffColor}">${diffStr}</div><div class="elo-stat-label">Évolution</div></div>
+    <div class="elo-stat-card"><div class="elo-stat-value elo-positive">${max}</div><div class="elo-stat-label">Maximum</div></div>
+    <div class="elo-stat-card"><div class="elo-stat-value elo-negative">${min}</div><div class="elo-stat-label">Minimum</div></div>`;
+
+  if (eloChartInstance) eloChartInstance.destroy();
+  const ctx = document.getElementById('eloChart').getContext('2d');
+  const grad = ctx.createLinearGradient(0,0,0,280);
+  grad.addColorStop(0,'rgba(255,85,0,0.3)');
+  grad.addColorStop(1,'rgba(255,85,0,0)');
+
+  eloChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: `ELO — ${nickname}`,
+        data: values,
+        borderColor: '#ff5500',
+        backgroundColor: grad,
+        pointBackgroundColor: values.map((v,i)=>i===values.length-1?'#ff5500':'transparent'),
+        pointBorderColor: values.map((v,i)=>i===values.length-1?'#ff5500':'rgba(255,85,0,0.4)'),
+        pointRadius: values.map((v,i)=>i===values.length-1?5:3),
+        borderWidth: 2,
+        fill: true,
+        tension: 0.3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#e8eaf0', font: { family: 'IBM Plex Mono', size: 11 } } },
+        tooltip: { backgroundColor: '#14161a', borderColor: '#1f2229', borderWidth: 1, titleColor: '#ff5500', bodyColor: '#e8eaf0', callbacks: {
+          label: ctx => ` ELO: ${ctx.parsed.y}`
+        }}
+      },
+      scales: {
+        x: { ticks: { color: '#5a5f6e', font: { family: 'IBM Plex Mono', size: 10 }, maxTicksLimit: 10 }, grid: { color: '#1f2229' } },
+        y: { ticks: { color: '#5a5f6e', font: { family: 'IBM Plex Mono', size: 10 } }, grid: { color: '#1f2229' } }
+      }
+    }
+  });
+}
+
+// ── Logs ──────────────────────────────────────────────────────────────────────
+async function loadLogs() {
+  const logs = await api('/logs');
+  const list = document.getElementById('logList');
+  if (!logs.length) { list.innerHTML='<div class="empty-state">En attente d\'activité...</div>'; return; }
+  list.innerHTML = logs.map(l=>{
+    const t = new Date(l.time).toLocaleTimeString('fr-FR');
+    return `<div class="log-entry ${l.type}"><span class="log-time">${t}</span><span class="log-msg">${l.msg}</span></div>`;
+  }).join('');
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(`tab-${name}`).classList.add('active');
+  if (name === 'leaderboard' && !lbLoaded) loadLeaderboard();
+  if (name === 'history')  renderHistoryPills();
+  if (name === 'elo')      renderEloPills();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadStatus();
+loadLogs();
+setInterval(loadLogs, 5000);
+setInterval(loadStatus, 10000);
+</script>
+</body>
+</html>

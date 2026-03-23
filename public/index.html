@@ -389,6 +389,13 @@ async function addPlayer() {
   toast(`✅ ${res.nickname} ajouté !`);
 }
 
+async function backfillPlayer(id, nickname) {
+  toast(`🔄 Import des matchs de ${nickname}...`);
+  const res = await api(`/players/${id}/backfill`, { method: 'POST' });
+  if (res.ok) toast(`✅ Import lancé pour ${nickname} — attendre ~30s`);
+  else toast('❌ ' + res.error, 'err');
+}
+
 async function removePlayer(id) {
   await api(`/players/${id}`, { method:'DELETE' });
   players = players.filter(p => p.id !== id);
@@ -408,7 +415,10 @@ function renderPlayers() {
           <div class="player-sub">${p.country ? p.country.toUpperCase() + ' · ' : ''}${p.id.substring(0,8)}...</div>
         </div>
       </div>
-      <button class="btn-remove" onclick="removePlayer('${p.id}')">✕</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn-sm btn-muted" onclick="backfillPlayer('${p.id}','${p.nickname}')" title="Importer les 20 derniers matchs">↻ Importer</button>
+        <button class="btn-remove" onclick="removePlayer('${p.id}')">✕</button>
+      </div>
     </div>`).join('');
 }
 
@@ -502,9 +512,10 @@ async function selectHistoryPlayer(id, nickname) {
   document.getElementById('historyContent').innerHTML = '<div class="lb-loading"><span class="lb-loading-dots">Chargement</span></div>';
   const data = await api(`/history/${id}`);
   if (!data.length) { document.getElementById('historyContent').innerHTML='<div class="empty-state">Pas encore d\'historique pour ce joueur</div>'; return; }
+  const sorted = [...data].sort((a, b) => (b.ts || 0) - (a.ts || 0));
   document.getElementById('historyContent').innerHTML = `
     <div class="match-list">
-      ${data.map(m=>{
+      ${sorted.map(m=>{
         const d = m.ts ? new Date(m.ts).toLocaleDateString('fr-FR') : '?';
         const kdc = parseFloat(m.kd)>=1.5?'var(--green)':parseFloat(m.kd)<0.9?'var(--red)':'var(--text)';
         return `<div class="match-card ${m.result==='Win'?'win':'loss'}">

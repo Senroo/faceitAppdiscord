@@ -11,11 +11,13 @@ app.use(cors());
 app.use(express.static(path.join(__dirname, "public")));
 
 // ─── Persistent JSON files ───────────────────────────────────────────────────
-const CONFIG_FILE      = "./config.json";
-const SEEN_FILE        = "./seen_matches.json";
-const HISTORY_FILE     = "./match_history.json";
-const ELO_HISTORY_FILE = "./elo_history.json";
-const LEVELS_FILE      = "./player_levels.json";
+// Use /data volume on Railway, fallback to local dir
+const DATA_DIR = fs.existsSync("/data") ? "/data" : ".";
+const CONFIG_FILE      = `${DATA_DIR}/config.json`;
+const SEEN_FILE        = `${DATA_DIR}/seen_matches.json`;
+const HISTORY_FILE     = `${DATA_DIR}/match_history.json`;
+const ELO_HISTORY_FILE = `${DATA_DIR}/elo_history.json`;
+const LEVELS_FILE      = `${DATA_DIR}/player_levels.json`;
 
 function loadJSON(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, "utf8")); }

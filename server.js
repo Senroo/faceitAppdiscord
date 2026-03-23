@@ -176,14 +176,22 @@ async function getMatchStats(matchId) {
 function extractPlayerStats(playerId, matchStats, matchDetails) {
   try {
     const teams = matchStats.rounds?.[0]?.teams || [];
+    addLog(`🔍 extractPlayerStats: ${teams.length} équipes, cherche playerId=${playerId.substring(0,8)}`, "info");
+
     let playerData = null, playerTeam = null, opponentTeam = null;
 
     for (const team of teams) {
+      const playerIds = (team.players || []).map(p => p.player_id);
+      addLog(`🔍 Équipe players: ${playerIds.map(id => id.substring(0,8)).join(', ')}`, "info");
       const found = team.players?.find((p) => p.player_id === playerId);
       if (found) { playerData = found.player_stats; playerTeam = team; }
       else opponentTeam = team;
     }
-    if (!playerData) return null;
+
+    if (!playerData) {
+      addLog(`⚠️ Joueur ${playerId.substring(0,8)} non trouvé dans le match`, "warn");
+      return null;
+    }
 
     const roundStats = matchStats.rounds?.[0]?.round_stats || {};
     const map = (roundStats["Map"] || matchDetails.voting?.map?.pick?.[0] || "Unknown")
@@ -226,16 +234,19 @@ async function backfillPlayerHistory(player) {
         getMatchStats(match.match_id),
       ]);
       if (mStats) {
+        const rounds = mStats.rounds?.length || 0;
+        const firstTeamPlayers = mStats.rounds?.[0]?.teams?.[0]?.players?.length || 0;
+        addLog(`🔍 Match ${match.match_id.substring(0,8)}: ${rounds} rounds, ${firstTeamPlayers} joueurs équipe 1`, "info");
         const stats = extractPlayerStats(player.id, mStats, details);
         if (stats) {
           const ts = match.finished_at ? match.finished_at * 1000 : Date.now();
           storeMatchHistory(player.id, match.match_id, stats, ts);
           added++;
         } else {
-          addLog(`⚠️ Stats nulles pour match ${match.match_id}`, "warn");
+          addLog(`⚠️ Stats nulles pour match ${match.match_id.substring(0,8)}`, "warn");
         }
       } else {
-        addLog(`⚠️ Pas de stats pour match ${match.match_id}`, "warn");
+        addLog(`⚠️ mStats null pour match ${match.match_id.substring(0,8)}`, "warn");
       }
       if (!seenMatches[player.id]) seenMatches[player.id] = [];
       if (!seenMatches[player.id].includes(match.match_id)) {

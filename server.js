@@ -38,15 +38,18 @@ let config = loadJSON(CONFIG_FILE, {
 });
 
 // Override with environment variables if present (Railway deployment)
+// API keys always from env vars (secrets)
 if (process.env.FACEIT_API_KEY)    config.faceitApiKey    = process.env.FACEIT_API_KEY;
 if (process.env.DISCORD_WEBHOOK)   config.discordWebhook  = process.env.DISCORD_WEBHOOK;
 if (process.env.DISCORD_BOT_TOKEN) config.discordBotToken = process.env.DISCORD_BOT_TOKEN;
 if (process.env.DISCORD_GUILD_ID)  config.discordGuildId  = process.env.DISCORD_GUILD_ID;
-if (process.env.PLAYERS) {
-  try { config.players = JSON.parse(process.env.PLAYERS); } catch {}
-}
 if (process.env.POLL_INTERVAL)     config.pollIntervalSeconds = parseInt(process.env.POLL_INTERVAL);
 if (process.env.ACTIVE === "true") config.active = true;
+
+// Only load PLAYERS from env if no players saved in persistent config yet
+if (process.env.PLAYERS && config.players.length === 0) {
+  try { config.players = JSON.parse(process.env.PLAYERS); } catch {}
+}
 
 let seenMatches   = loadJSON(SEEN_FILE, {});
 let matchHistory  = loadJSON(HISTORY_FILE, {});    // { playerId: [ matchRecord, ... ] }
